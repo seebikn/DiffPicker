@@ -3,7 +3,6 @@ namespace DiffPicker
     public partial class MainForm : Form
     {
         public event EventHandler? OnHandleExecuteComparison;
-        public event EventHandler? OnHandleAdjustDiffPath;
         public event EventHandler? OnHandleComplementDiffPath;
         public event DragEventHandler? OnHandleDragEnter;
         public event DragEventHandler? OnHandleDragDrop;
@@ -23,8 +22,6 @@ namespace DiffPicker
         public MainForm()
         {
             InitializeComponent();
-            TextBoxDiffPath.LostFocus += (s, e) => OnHandleAdjustDiffPath?.Invoke(s, e);
-            ButtomExecute.Click += (s, e) => OnHandleAdjustDiffPath?.Invoke(s, e);
             ButtomExecute.Click += (s, e) => OnHandleExecuteComparison?.Invoke(s, e);
 
             ButtomComplementBefore.Click += (s, e) => OnHandleComplementDiffPath?.Invoke(TextBoxBefore, e);

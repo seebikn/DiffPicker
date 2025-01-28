@@ -84,9 +84,9 @@
             label3.AutoSize = true;
             label3.Location = new Point(12, 76);
             label3.Name = "label3";
-            label3.Size = new Size(78, 15);
+            label3.Size = new Size(66, 15);
             label3.TabIndex = 4;
-            label3.Text = "出力フォルダ名";
+            label3.Text = "差分フォルダ";
             // 
             // TextBoxDiffFolderName
             // 
@@ -95,7 +95,7 @@
             TextBoxDiffFolderName.Name = "TextBoxDiffFolderName";
             TextBoxDiffFolderName.Size = new Size(108, 23);
             TextBoxDiffFolderName.TabIndex = 5;
-            TextBoxDiffFolderName.Text = "差分";
+            TextBoxDiffFolderName.Text = "xx_差分比較";
             // 
             // label4
             // 
@@ -120,7 +120,7 @@
             TextBoxOmitFilename.Name = "TextBoxOmitFilename";
             TextBoxOmitFilename.Size = new Size(309, 23);
             TextBoxOmitFilename.TabIndex = 8;
-            TextBoxOmitFilename.Text = "*.dll;";
+            TextBoxOmitFilename.Text = ".dll;.exe;";
             // 
             // TextBoxOmitFolder
             // 
@@ -196,6 +196,7 @@
             Controls.Add(TextBoxBefore);
             Controls.Add(label1);
             Name = "MainForm";
+            StartPosition = FormStartPosition.CenterScreen;
             Text = "DiffPicker";
             ResumeLayout(false);
             PerformLayout();

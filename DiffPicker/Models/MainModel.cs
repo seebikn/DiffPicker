@@ -4,16 +4,20 @@ namespace DiffPicker.Models
 {
     internal class MainModel
     {
-        public void CompareAndCopyAsync(string beforePath, string afterPath, string diffPath, List<string> omitFiles, List<string> omitFolders)
+        /// <summary>
+        /// 2つの比較用パスから差分のあるファイルを別フォルダにコピーする
+        /// </summary>
+        /// <param name="beforePathModel">修正前パスモデル</param>
+        /// <param name="afterPathModel">修正後パスモデル</param>
+        /// <exception cref="Exception"></exception>
+        public void CompareAndCopy(FilePathModel beforePathModel, FilePathModel afterPathModel)
         {
             // 差分が一件でもあるか管理するフラグ
             bool diff = false;
 
             // ファイル一覧を取得
-            string beforeZipPath = string.Empty;
-            string afterZipPath = string.Empty;
-            var beforeFiles = EnumerateFiles(ref beforePath, ref beforeZipPath, omitFiles, omitFolders, diffPath);
-            var afterFiles = EnumerateFiles(ref afterPath, ref afterZipPath, omitFiles, omitFolders, diffPath);
+            var beforeFiles = beforePathModel.EnumerateFiles();
+            var afterFiles = afterPathModel.EnumerateFiles();
             List<string> targetFiles;
 
             {
@@ -23,27 +27,26 @@ namespace DiffPicker.Models
                 var beforeExceptFiles = beforeFiles.Except(afterFiles).ToArray();
                 var afterExceptFiles = afterFiles.Except(beforeFiles).ToArray();
 
-                if (beforeFiles.Count() == beforeExceptFiles.Count() 
-                    || afterFiles.Count() == afterExceptFiles.Count())
+                if (beforeFiles.Count == beforeExceptFiles.Length
+                    || afterFiles.Count == afterExceptFiles.Length)
                 {
-                    throw new Exception("全て一致しないため処理を終了します。");
+                    throw new Exception("ファイルが全て一致しないため処理を終了します。");
                 }
 
-                // ローカルメソッド：差分ファイルを差分パスにコピー
-                void copyFilesToDiffPath(string path, string[] exceptFiles, string folderName)
+                // ローカルメソッド：差分ファイルを差分出力先にコピー
+                void copyFilesToDiffPath(string workingPath, string destinationPath, string[] exceptFiles)
                 {
                     foreach (var filepath in exceptFiles)
                     {
-                        var sourceFilePath = Path.Combine(path, filepath);
-                        var destFilepath = Path.Combine(diffPath, folderName, filepath);
+                        var sourceFilePath = Path.Combine(workingPath, filepath);
+                        var destFilepath = Path.Combine(destinationPath, filepath);
                         Directory.CreateDirectory(Path.GetDirectoryName(destFilepath)!);
-
                         File.Copy(sourceFilePath, destFilepath);
                         diff = true;
                     }
                 }
-                copyFilesToDiffPath(beforePath, beforeExceptFiles, "1_before");
-                copyFilesToDiffPath(afterPath, afterExceptFiles, "2_after");
+                copyFilesToDiffPath(beforePathModel.WorkingPath, beforePathModel.GetDestinationPath(), beforeExceptFiles);
+                copyFilesToDiffPath(afterPathModel.WorkingPath, afterPathModel.GetDestinationPath(), afterExceptFiles);
 
                 // 差分ファイルを取り除く
                 targetFiles = beforeFiles.Except(beforeExceptFiles).ToList();
@@ -52,22 +55,22 @@ namespace DiffPicker.Models
             // ファイルのハッシュを比較し、異なる場合はファイルを複製する
             foreach (var file in targetFiles)
             {
-                var beforeFilePath = Path.Combine(beforePath, file);
-                var afterFilePath = Path.Combine(afterPath, file);
+                var beforeFilePath = Path.Combine(beforePathModel.WorkingPath, file);
+                var afterFilePath = Path.Combine(afterPathModel.WorkingPath, file);
 
                 if (!EqualFiles(beforeFilePath, afterFilePath))
                 {
                     // ファイルに差異がある場合、それぞれのファイルをコピーする
 
-                    void copyFileToDiffPath(string sourceFilePath, string folderName, string filepath)
+                    void copyFileToDiffPath(string sourceFilepath, string destinationPath, string filepath)
                     {
-                        var destFilepath = Path.Combine(diffPath, folderName, filepath);
+                        var destFilepath = Path.Combine(destinationPath, filepath);
                         Directory.CreateDirectory(Path.GetDirectoryName(destFilepath)!);
-                        File.Copy(sourceFilePath, destFilepath);
+                        File.Copy(sourceFilepath, destFilepath);
                         diff = true;
                     }
-                    copyFileToDiffPath(beforeFilePath, "1_before", file);
-                    copyFileToDiffPath(afterFilePath, "2_after", file);
+                    copyFileToDiffPath(beforeFilePath, beforePathModel.GetDestinationPath(), file);
+                    copyFileToDiffPath(afterFilePath, afterPathModel.GetDestinationPath(), file);
                 }
             }
 
@@ -75,62 +78,22 @@ namespace DiffPicker.Models
             {
                 // 1つでも差異があった場合
 
-                var beforeFilePath = Path.Combine(diffPath, "1_before");
-                Directory.CreateDirectory(beforeFilePath);
+                // 差分出力先パスを作成
+                Directory.CreateDirectory(beforePathModel.GetDestinationPath());
+                Directory.CreateDirectory(afterPathModel.GetDestinationPath());
 
-                var afterFilePath = Path.Combine(diffPath, "2_after");
-                Directory.CreateDirectory(afterFilePath);
-
-                // todo : winmerge比較ファイルを作る
-                string winMergeFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diff.WinMerge");
-                string destinationPath = Path.Combine(diffPath, "diff.WinMerge");
-                File.Copy(winMergeFilePath, destinationPath, true);
-
-                string content = File.ReadAllText(destinationPath);
-                content = content.Replace("@@@before@@@", "1_before");
-                content = content.Replace("@@@after@@@", "2_after");
-                File.WriteAllText(destinationPath, content);
-            }
-
-            {
-                // zipを解凍した場合はフォルダを削除
-
-                if (!string.IsNullOrEmpty(beforeZipPath))
+                // winmerge比較ファイルを作成
                 {
-                    Directory.Delete(beforeZipPath, true);
-                }
-                if (!string.IsNullOrEmpty(afterZipPath))
-                {
-                    Directory.Delete(afterZipPath, true);
+                    string winMergeFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diff.WinMerge");
+                    string destinationPath = Path.Combine(beforePathModel.DiffParentPath, "diff.WinMerge");
+                    File.Copy(winMergeFilePath, destinationPath, true);
+
+                    string content = File.ReadAllText(destinationPath);
+                    content = content.Replace("@@@before@@@", "01_修正前");
+                    content = content.Replace("@@@after@@@", "02_修正後");
+                    File.WriteAllText(destinationPath, content);
                 }
             }
-        }
-
-        /// <summary>
-        /// パス配下のファイル一覧を返すメソッド
-        /// 一覧から除外フォルダ、除外ファイルは除外する。
-        /// パスがzipの場合は差分パス配下に解凍し、解凍したパスをrefで返す。
-        /// </summary>
-        /// <param name="path">パス</param>
-        /// <param name="zipPath">パス</param>
-        /// <param name="omitFiles">除外ファイル</param>
-        /// <param name="omitFolders">除外フォルダ</param>
-        /// <param name="diffPath">差分パス</param>
-        /// <returns>パス配下のファイル一覧</returns>
-        private static List<string> EnumerateFiles(ref string path, ref string zipPath, List<string> omitFiles, List<string> omitFolders, string diffPath)
-        {
-            if (File.Exists(path))
-            {
-                zipPath = Path.Combine(diffPath, Guid.NewGuid().ToString());
-                System.IO.Compression.ZipFile.ExtractToDirectory(path, zipPath);
-                path = Path.Combine(zipPath, System.IO.Path.GetFileNameWithoutExtension(path));
-            }
-
-            string path2 = path;
-            var files = Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories);
-            return files.Select(file => file.Replace(path2, "").TrimStart('\\'))
-                        .Where(file => !omitFiles.Any(omit => file.EndsWith(omit, StringComparison.OrdinalIgnoreCase)) &&
-                               !omitFolders.Any(folder => file.Contains(Path.DirectorySeparatorChar + folder + Path.DirectorySeparatorChar))).ToList();
         }
 
         /// <summary>

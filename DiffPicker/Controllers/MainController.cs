@@ -1,11 +1,12 @@
-﻿using DiffPicker.Models;
+﻿using System.Diagnostics;
+using DiffPicker.Models;
 
 namespace DiffPicker.Controllers
 {
     internal class MainController
     {
-        private MainForm view;
-        private MainModel model;
+        private readonly MainForm view;
+        private readonly MainModel model;
 
         public MainController()
         {
@@ -13,7 +14,6 @@ namespace DiffPicker.Controllers
             view = new MainForm();
 
             view.OnHandleExecuteComparison += HandleExecuteComparison;
-            view.OnHandleAdjustDiffPath += HandleAdjustDiffPath;
             view.OnHandleComplementDiffPath += HandleComplementDiffPath;
 
             view.OnHandleDragEnter += HandleDragEnter;
@@ -29,53 +29,94 @@ namespace DiffPicker.Controllers
         {
             try
             {
-                var beforePath = view.GetTextBoxBefore();
-                var afterPath = view.GetTextBoxAfter();
-                var diffPath = view.GetTextBoxDiffPath();
+                var diffFolderName = view.GetTextBoxDiffFolderName();
+                if (string.IsNullOrWhiteSpace(diffFolderName))
+                {
+                    MessageBox.Show("差分フォルダを入力してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    return;
+                }
 
-                ValidatePaths(beforePath, afterPath, diffPath);
+                // 各フォルダパスの取得とエラーチェック
+                var diffPathModel = new FilePathModel(view.GetTextBoxDiffPath(), "差分出力パス");
+                var beforePathModel = new FilePathModel(view.GetTextBoxBefore(), "修正前パス");
+                var afterPathModel = new FilePathModel(view.GetTextBoxAfter(), "修正後パス");
 
-                if (Directory.Exists(diffPath))
+                // ローカル関数：パスのエラーチェック
+                static bool isPathError(FilePathModel model, bool zip)
+                {
+                    if (zip)
+                    {
+                        if (!(model.IsValidPath() || model.IsZipFile()))
+                        {
+                            MessageBox.Show($"{model.Name}にはフォルダパスかzipファイルパスを入力してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                            return true;
+                        }
+                    } 
+                    else
+                    {
+                        if (!model.IsValidPath())
+                        {
+                            MessageBox.Show($"{model.Name}にはフォルダパスを入力してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                if (isPathError(diffPathModel, false) || isPathError(beforePathModel, true) || isPathError(afterPathModel, true))
+                {
+                    return;
+                }
+
+                // 差分フォルダパスのエラーチェック
+                string diffParentPath = diffPathModel.GetManagedPathCombine(diffFolderName);
+                if (Directory.Exists(diffParentPath))
                 {
                     var result = MessageBox.Show("差分フォルダを削除してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                     return;
                 }
-                Directory.CreateDirectory(diffPath);
 
+                // 除外ファイル名、除外フォルダ名を取得
                 var omitFiles = view.GetTextBoxOmitFilename().Split(';').Where(str => !string.IsNullOrEmpty(str)).ToList();
                 var omitFolders = view.GetTextBoxOmitFolder().Split(';').Where(str => !string.IsNullOrEmpty(str)).ToList();
 
-                model.CompareAndCopyAsync(
-                          beforePath
-                        , afterPath
-                        , diffPath
-                        , omitFiles
-                        , omitFolders
+                // ファイルパスモデルに情報追加
+                {
+                    beforePathModel.DiffParentPath = diffParentPath;
+                    beforePathModel.DiffFolder = "01_修正前";
+                    beforePathModel.OmitFiles = omitFiles;
+                    beforePathModel.OmitFolders = omitFolders;
+
+                    afterPathModel.DiffParentPath = diffParentPath;
+                    afterPathModel.DiffFolder = "02_修正後";
+                    afterPathModel.OmitFiles = omitFiles;
+                    afterPathModel.OmitFolders = omitFolders;
+                }
+
+                // 作業フォルダの確定指示
+                beforePathModel.ConfirmWorkingDirectory();
+                afterPathModel.ConfirmWorkingDirectory();
+
+                var bepath = beforePathModel.EnumerateFiles();
+                foreach (var be in bepath)
+                {
+                    Debug.WriteLine(be);
+                }
+
+                // 差分抽出
+                model.CompareAndCopy(
+                          beforePathModel
+                        , afterPathModel
                     );
+
+                // 作業フォルダの後始末
+                beforePathModel.CleanupWorkingDirectory();
+                afterPathModel.CleanupWorkingDirectory();
 
                 MessageBox.Show("比較が完了しました。", "完了", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void ValidatePaths(string before, string after, string diff)
-        {
-            if (!Directory.Exists(before) && !File.Exists(before))
-            {
-                throw new ArgumentException("修正前のパスが存在しません。");
-            }
-
-            if (!Directory.Exists(after) && !File.Exists(after))
-            {
-                throw new ArgumentException("修正後のパスが存在しません。");
-            }
-
-            if (string.IsNullOrWhiteSpace(diff))
-            {
-                throw new ArgumentException("差分出力パスが指定されていません。");
             }
         }
 
@@ -89,8 +130,8 @@ namespace DiffPicker.Controllers
         {
             if (e.Data!.GetDataPresent(DataFormats.FileDrop))
             {
-                var paths = (string[])e.Data.GetData(DataFormats.FileDrop)!;
-                if (paths.Length > 0 && (Directory.Exists(paths[0]) || IsZipFile(paths[0])))
+                var (isPath, _) = IsDragDrop(e);
+                if (isPath)
                 {
                     e.Effect = DragDropEffects.Copy; // フォルダまたはZIPファイルならコピー可能
                     return;
@@ -106,34 +147,24 @@ namespace DiffPicker.Controllers
         /// <param name="e"></param>
         private void HandleDragDrop(object? sender, DragEventArgs e)
         {
-            var paths = (string[])e.Data!.GetData(DataFormats.FileDrop)!;
-            if (paths.Length > 0 && (Directory.Exists(paths[0]) || IsZipFile(paths[0])))
+            var (isPath, path) = IsDragDrop(e);
+            if (isPath)
             {
-                ((TextBox)sender!).Text = paths[0];
+                ((TextBox)sender!).Text = path;
             }
         }
 
-        private bool IsZipFile(string path)
-        {
-            return File.Exists(path) && Path.GetExtension(path).Equals(".zip", StringComparison.OrdinalIgnoreCase);
-        }
-        #endregion
-
-        #region " 差分出力パスの調整 "
         /// <summary>
-        /// 差分出力パスの最後のフォルダが出力フォルダ名でない場合、最後に出力フォルダ名を加える
+        /// ディレクトリパスかzipパスであればtrueを返す
         /// </summary>
-        /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void HandleAdjustDiffPath(object? sender, EventArgs e)
+        /// <returns></returns>
+        private static (bool isPath, string path) IsDragDrop(DragEventArgs e)
         {
-            var diffFolderName = view.GetTextBoxDiffFolderName();
-            var diffPath = view.GetTextBoxDiffPath();
-
-            if (!diffPath.EndsWith(diffFolderName, StringComparison.OrdinalIgnoreCase))
-            {
-                view.SetTextBoxDiffPath(Path.Combine(diffPath, diffFolderName));
-            }
+            var paths = (string[])e.Data!.GetData(DataFormats.FileDrop)!;
+            var model = new FilePathModel(paths[0], string.Empty);
+            var res = model.IsValidPath() || model.IsZipFile();
+            return (res, model.ManagedPath );
         }
         #endregion
 

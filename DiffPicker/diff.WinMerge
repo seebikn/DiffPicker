@@ -3,8 +3,6 @@
 	<paths>
 		<left>@@@before@@@</left>
 		<right>@@@after@@@</right>
-		<left-desc>修正前</left-desc>
-		<right-desc>修正後</right-desc>
 		<filter>*.*</filter>
 		<subfolders>1</subfolders>
 		<left-readonly>0</left-readonly>
