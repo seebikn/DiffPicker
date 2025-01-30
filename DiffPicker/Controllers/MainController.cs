@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using DiffPicker.Models;
 
 namespace DiffPicker.Controllers
@@ -22,6 +23,19 @@ namespace DiffPicker.Controllers
 
         public void Run()
         {
+            {
+                // アセンブリ名とバージョンを取得
+                Assembly assembly = Assembly.GetExecutingAssembly();
+                AssemblyName assemblyName = assembly.GetName();
+                string appName = assemblyName.Name!;
+                Version version = assemblyName.Version!;
+                string majorVersion = version.Major.ToString();
+                string minorVersion = version.Minor.ToString();
+
+                // フォームのタイトルを設定
+                view.Text = $"{appName} - Version {majorVersion}.{minorVersion}";
+            }
+
             Application.Run(view);
         }
 
