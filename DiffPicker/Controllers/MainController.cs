@@ -96,17 +96,13 @@ namespace DiffPicker.Controllers
                 beforePathModel.ConfirmWorkingDirectory();
                 afterPathModel.ConfirmWorkingDirectory();
 
-                var bepath = beforePathModel.EnumerateFiles();
-                foreach (var be in bepath)
-                {
-                    Debug.WriteLine(be);
-                }
-
                 // 差分抽出
+                Cursor.Current = Cursors.WaitCursor;
                 model.CompareAndCopy(
                           beforePathModel
                         , afterPathModel
                     );
+                Cursor.Current = Cursors.Default;
 
                 // 作業フォルダの後始末
                 beforePathModel.CleanupWorkingDirectory();
