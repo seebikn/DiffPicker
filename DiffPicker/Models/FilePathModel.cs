@@ -36,7 +36,7 @@ namespace DiffPicker.Models
         /// <summary>
         /// zip解凍フォルダ
         /// </summary>
-        public string ZipFolder { get; }
+        private string ZipFolder { get; }
 
         /// <summary>
         /// 除外ファイル名
@@ -51,7 +51,7 @@ namespace DiffPicker.Models
         /// <summary>
         /// 作業フォルダ名
         /// </summary>
-        public string WorkingPath { get; set; }
+        private string WorkingPath { get; set; }
 
         /// <summary>
         /// コンストラクタ
@@ -114,6 +114,15 @@ namespace DiffPicker.Models
         public string GetDestinationPath()
         {
             return Path.Combine(this.DiffParentPath, this.DiffFolder);
+        }
+
+        /// <summary>
+        /// コピー元フォルダを返す
+        /// </summary>
+        /// <returns></returns>
+        public string GetSourcePath()
+        {
+            return this.WorkingPath;
         }
 
         /// <summary>

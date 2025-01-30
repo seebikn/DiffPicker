@@ -15,6 +15,12 @@ namespace DiffPicker.Models
             // 差分が一件でもあるか管理するフラグ
             bool diff = false;
 
+            // コピー先・コピー元フォルダパスを取得
+            string beforeSourcePath = beforePathModel.GetSourcePath();
+            string beforeDestinationPath = beforePathModel.GetDestinationPath();
+            string afterSourcePath = afterPathModel.GetSourcePath();
+            string afterDestinationPath = afterPathModel.GetDestinationPath();
+
             // ファイル一覧を取得
             var beforeFiles = beforePathModel.EnumerateFiles();
             var afterFiles = afterPathModel.EnumerateFiles();
@@ -45,8 +51,8 @@ namespace DiffPicker.Models
                         diff = true;
                     }
                 }
-                copyFilesToDiffPath(beforePathModel.WorkingPath, beforePathModel.GetDestinationPath(), beforeExceptFiles);
-                copyFilesToDiffPath(afterPathModel.WorkingPath, afterPathModel.GetDestinationPath(), afterExceptFiles);
+                copyFilesToDiffPath(beforeSourcePath, beforeDestinationPath, beforeExceptFiles);
+                copyFilesToDiffPath(afterSourcePath, afterDestinationPath, afterExceptFiles);
 
                 // 差分ファイルを取り除く
                 targetFiles = beforeFiles.Except(beforeExceptFiles).ToList();
@@ -55,13 +61,14 @@ namespace DiffPicker.Models
             // ファイルのハッシュを比較し、異なる場合はファイルを複製する
             foreach (var file in targetFiles)
             {
-                var beforeFilePath = Path.Combine(beforePathModel.WorkingPath, file);
-                var afterFilePath = Path.Combine(afterPathModel.WorkingPath, file);
+                var beforeFilePath = Path.Combine(beforeSourcePath, file);
+                var afterFilePath = Path.Combine(afterSourcePath, file);
 
                 if (!EqualFiles(beforeFilePath, afterFilePath))
                 {
                     // ファイルに差異がある場合、それぞれのファイルをコピーする
 
+                    // ローカルメソッド：
                     void copyFileToDiffPath(string sourceFilepath, string destinationPath, string filepath)
                     {
                         var destFilepath = Path.Combine(destinationPath, filepath);
@@ -69,8 +76,8 @@ namespace DiffPicker.Models
                         File.Copy(sourceFilepath, destFilepath);
                         diff = true;
                     }
-                    copyFileToDiffPath(beforeFilePath, beforePathModel.GetDestinationPath(), file);
-                    copyFileToDiffPath(afterFilePath, afterPathModel.GetDestinationPath(), file);
+                    copyFileToDiffPath(beforeFilePath, beforeDestinationPath, file);
+                    copyFileToDiffPath(afterFilePath, afterDestinationPath, file);
                 }
             }
 
