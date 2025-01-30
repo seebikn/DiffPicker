@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using DiffPicker.Models;
 
 namespace DiffPicker.Controllers
@@ -22,6 +23,19 @@ namespace DiffPicker.Controllers
 
         public void Run()
         {
+            {
+                // アセンブリ名とバージョンを取得
+                Assembly assembly = Assembly.GetExecutingAssembly();
+                AssemblyName assemblyName = assembly.GetName();
+                string appName = assemblyName.Name!;
+                Version version = assemblyName.Version!;
+                string majorVersion = version.Major.ToString();
+                string minorVersion = version.Minor.ToString();
+
+                // フォームのタイトルを設定
+                view.Text = $"{appName} - Version {majorVersion}.{minorVersion}";
+            }
+
             Application.Run(view);
         }
 
@@ -96,17 +110,13 @@ namespace DiffPicker.Controllers
                 beforePathModel.ConfirmWorkingDirectory();
                 afterPathModel.ConfirmWorkingDirectory();
 
-                var bepath = beforePathModel.EnumerateFiles();
-                foreach (var be in bepath)
-                {
-                    Debug.WriteLine(be);
-                }
-
                 // 差分抽出
+                Cursor.Current = Cursors.WaitCursor;
                 model.CompareAndCopy(
                           beforePathModel
                         , afterPathModel
                     );
+                Cursor.Current = Cursors.Default;
 
                 // 作業フォルダの後始末
                 beforePathModel.CleanupWorkingDirectory();

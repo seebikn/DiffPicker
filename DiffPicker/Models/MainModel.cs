@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Collections.Concurrent;
+using System.Security.Cryptography;
 
 namespace DiffPicker.Models
 {
@@ -14,6 +15,13 @@ namespace DiffPicker.Models
         {
             // 差分が一件でもあるか管理するフラグ
             bool diff = false;
+            var diffBag = new ConcurrentBag<bool>();
+
+            // コピー先・コピー元フォルダパスを取得
+            string beforeSourcePath = beforePathModel.GetSourcePath();
+            string beforeDestinationPath = beforePathModel.GetDestinationPath();
+            string afterSourcePath = afterPathModel.GetSourcePath();
+            string afterDestinationPath = afterPathModel.GetDestinationPath();
 
             // ファイル一覧を取得
             var beforeFiles = beforePathModel.EnumerateFiles();
@@ -34,45 +42,50 @@ namespace DiffPicker.Models
                 }
 
                 // ローカルメソッド：差分ファイルを差分出力先にコピー
-                void copyFilesToDiffPath(string workingPath, string destinationPath, string[] exceptFiles)
+                void CopyFilesToDiffPath(string workingPath, string destinationPath, string[] exceptFiles)
                 {
-                    foreach (var filepath in exceptFiles)
+                    Parallel.ForEach(exceptFiles, filepath =>
                     {
                         var sourceFilePath = Path.Combine(workingPath, filepath);
-                        var destFilepath = Path.Combine(destinationPath, filepath);
-                        Directory.CreateDirectory(Path.GetDirectoryName(destFilepath)!);
-                        File.Copy(sourceFilePath, destFilepath);
-                        diff = true;
-                    }
+                        var destFilePath = Path.Combine(destinationPath, filepath);
+                        Directory.CreateDirectory(Path.GetDirectoryName(destFilePath)!);
+                        File.Copy(sourceFilePath, destFilePath, true);
+                        diffBag.Add(true);
+                    });
                 }
-                copyFilesToDiffPath(beforePathModel.WorkingPath, beforePathModel.GetDestinationPath(), beforeExceptFiles);
-                copyFilesToDiffPath(afterPathModel.WorkingPath, afterPathModel.GetDestinationPath(), afterExceptFiles);
+
+                CopyFilesToDiffPath(beforeSourcePath, beforeDestinationPath, beforeExceptFiles);
+                CopyFilesToDiffPath(afterSourcePath, afterDestinationPath, afterExceptFiles);
 
                 // 差分ファイルを取り除く
                 targetFiles = beforeFiles.Except(beforeExceptFiles).ToList();
             }
 
             // ファイルのハッシュを比較し、異なる場合はファイルを複製する
-            foreach (var file in targetFiles)
+            Parallel.ForEach(targetFiles, file =>
             {
-                var beforeFilePath = Path.Combine(beforePathModel.WorkingPath, file);
-                var afterFilePath = Path.Combine(afterPathModel.WorkingPath, file);
+                var beforeFilePath = Path.Combine(beforeSourcePath, file);
+                var afterFilePath = Path.Combine(afterSourcePath, file);
 
                 if (!EqualFiles(beforeFilePath, afterFilePath))
                 {
                     // ファイルに差異がある場合、それぞれのファイルをコピーする
 
-                    void copyFileToDiffPath(string sourceFilepath, string destinationPath, string filepath)
+                    // ローカルメソッド：
+                    void CopyFileToDiffPath(string sourceFilepath, string destinationPath, string filepath)
                     {
                         var destFilepath = Path.Combine(destinationPath, filepath);
                         Directory.CreateDirectory(Path.GetDirectoryName(destFilepath)!);
-                        File.Copy(sourceFilepath, destFilepath);
-                        diff = true;
+                        File.Copy(sourceFilepath, destFilepath, true);
+                        diffBag.Add(true);
                     }
-                    copyFileToDiffPath(beforeFilePath, beforePathModel.GetDestinationPath(), file);
-                    copyFileToDiffPath(afterFilePath, afterPathModel.GetDestinationPath(), file);
+
+                    CopyFileToDiffPath(beforeFilePath, beforeDestinationPath, file);
+                    CopyFileToDiffPath(afterFilePath, afterDestinationPath, file);
                 }
-            }
+            });
+
+            diff = !diffBag.IsEmpty;
 
             if (diff)
             {
@@ -107,11 +120,7 @@ namespace DiffPicker.Models
             using var hash = SHA256.Create();
             using var stream1 = File.OpenRead(file1);
             using var stream2 = File.OpenRead(file2);
-
-            var hash1 = hash.ComputeHash(stream1);
-            var hash2 = hash.ComputeHash(stream2);
-
-            return hash1.SequenceEqual(hash2);
+            return hash.ComputeHash(stream1).SequenceEqual(hash.ComputeHash(stream2));
         }
 
     }
