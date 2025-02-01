@@ -160,10 +160,16 @@ namespace DiffPicker.Controllers
                     {
                         writer.WriteLine(result);
                     }
+
+                    Cursor.Current = Cursors.Default;
+                    MessageBox.Show("比較が完了しました。", "完了", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    Cursor.Current = Cursors.Default;
+                    MessageBox.Show("差異が見つかりません", "差異なし", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 }
 
-                Cursor.Current = Cursors.Default;
-                MessageBox.Show("比較が完了しました。", "完了", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
