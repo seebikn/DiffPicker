@@ -1,4 +1,4 @@
-namespace DiffPicker
+﻿namespace DiffPicker
 {
     public partial class MainForm : Form
     {
@@ -14,9 +14,24 @@ namespace DiffPicker
         public string GetTextBoxOmitFilename() => TextBoxOmitFilename.Text;
         public string GetTextBoxOmitFolder() => TextBoxOmitFolder.Text;
 
+        public void SetTextBoxBefore(string str)
+        {
+            TextBoxBefore.Text = str;
+        }
+
+        public void SetTextBoxAfter(string str)
+        {
+            TextBoxAfter.Text = str;
+        }
+
         public void SetTextBoxDiffPath(string str)
         {
             TextBoxDiffPath.Text = str;
+        }
+
+        public void SetTextBoxResult(string str)    
+        {
+            TextBoxResult.Text = str; 
         }
 
         public MainForm()
@@ -27,6 +42,8 @@ namespace DiffPicker
             ButtomComplementBefore.Click += (s, e) => OnHandleComplementDiffPath?.Invoke(TextBoxBefore, e);
             ButtomComplementAfter.Click += (s, e) => OnHandleComplementDiffPath?.Invoke(TextBoxAfter, e);
 
+            this.DragEnter += (s, e) => OnHandleDragEnter?.Invoke(s, e);
+            this.DragDrop += (s, e) => OnHandleDragDrop?.Invoke(s, e);
             TextBoxBefore.DragEnter += (s, e) => OnHandleDragEnter?.Invoke(s, e);
             TextBoxBefore.DragDrop += (s, e) => OnHandleDragDrop?.Invoke(s, e);
             TextBoxAfter.DragEnter += (s, e) => OnHandleDragEnter?.Invoke(s, e);
@@ -35,6 +52,28 @@ namespace DiffPicker
             TextBoxDiffPath.DragDrop += (s, e) => OnHandleDragDrop?.Invoke(s, e);
         }
 
+        public void SetReadOnlyState(bool isReadOnly)
+        {
+            TextBoxBefore.ReadOnly = isReadOnly;
+            TextBoxAfter.ReadOnly = isReadOnly;
+        }
+
+        private void ButtonClear_Click(object sender, EventArgs e)
+        {
+            if (TextBoxBefore.ReadOnly || TextBoxAfter.ReadOnly)
+            {
+                // ロックされている場合は解除する
+                SetReadOnlyState(false);
+            }
+            else
+            {
+                // ロックされていない場合はテキストクリア
+                TextBoxBefore.Text = string.Empty;
+                TextBoxAfter.Text = string.Empty;
+                TextBoxDiffPath.Text = string.Empty;
+                TextBoxResult.Text = string.Empty;
+            }
+        }
     }
 
 }

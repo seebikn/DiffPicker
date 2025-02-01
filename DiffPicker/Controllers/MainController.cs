@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 using DiffPicker.Models;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace DiffPicker.Controllers
 {
@@ -85,7 +87,7 @@ namespace DiffPicker.Controllers
                 string diffParentPath = diffPathModel.GetManagedPathCombine(diffFolderName);
                 if (Directory.Exists(diffParentPath))
                 {
-                    var result = MessageBox.Show("差分フォルダを削除してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    MessageBox.Show("差分フォルダを削除してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                     return;
                 }
 
@@ -110,23 +112,70 @@ namespace DiffPicker.Controllers
                 beforePathModel.ConfirmWorkingDirectory();
                 afterPathModel.ConfirmWorkingDirectory();
 
+                // ReadOnlyに変更
+                view.SetReadOnlyState(true);
+
                 // 差分抽出
                 Cursor.Current = Cursors.WaitCursor;
-                model.CompareAndCopy(
-                          beforePathModel
-                        , afterPathModel
-                    );
-                Cursor.Current = Cursors.Default;
+                int[] ret = model.CompareAndCopy(
+                                  beforePathModel
+                                , afterPathModel
+                            );
 
                 // 作業フォルダの後始末
                 beforePathModel.CleanupWorkingDirectory();
                 afterPathModel.CleanupWorkingDirectory();
 
-                MessageBox.Show("比較が完了しました。", "完了", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // 結果表示
+                string result = $"実行時刻   {DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")}\r\n"
+                              + $"修正前ファイル数     " + ret[0].ToString("N0").PadLeft(9) + "\r\n"
+                              + $"修正後ファイル数     " + ret[1].ToString("N0").PadLeft(9) + "\r\n"
+                              + $"修正前専用ファイル数 " + ret[2].ToString("N0").PadLeft(9) + "\r\n"
+                              + $"修正後専用ファイル数 " + ret[3].ToString("N0").PadLeft(9) + "\r\n"
+                              + $"異なるファイル数     " + ret[4].ToString("N0").PadLeft(9) + "\r\n";
+                view.SetTextBoxResult(result);
+
+                if (ret[2] + ret[3] + ret[4] > 0)
+                {
+                    // 1つでも差異があった場合
+
+                    // 差分出力先パスを作成
+                    Directory.CreateDirectory(beforePathModel.GetDestinationPath());
+                    Directory.CreateDirectory(afterPathModel.GetDestinationPath());
+
+                    // winmerge比較ファイルを作成
+                    {
+                        string winMergeFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diff.WinMerge");
+                        string destinationPath = Path.Combine(beforePathModel.DiffParentPath, "diff.WinMerge");
+                        File.Copy(winMergeFilePath, destinationPath, true);
+
+                        string content = File.ReadAllText(destinationPath);
+                        content = content.Replace("@@@before@@@", "01_修正前");
+                        content = content.Replace("@@@after@@@", "02_修正後");
+                        File.WriteAllText(destinationPath, content);
+                    }
+
+                    Encoding enc = Encoding.GetEncoding("UTF-8");
+                    using (StreamWriter writer = new StreamWriter(Path.Combine(beforePathModel.DiffParentPath, "result.txt"), false, enc))
+                    {
+                        writer.WriteLine(result);
+                    }
+
+                    Cursor.Current = Cursors.Default;
+                    MessageBox.Show("比較が完了しました。", "完了", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    Cursor.Current = Cursors.Default;
+                    MessageBox.Show("差異が見つかりません", "差異なし", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                }
+
             }
             catch (Exception ex)
             {
+                Cursor.Current = Cursors.Default;
                 MessageBox.Show(ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                view.SetReadOnlyState(false);
             }
         }
 
@@ -140,14 +189,14 @@ namespace DiffPicker.Controllers
         {
             if (e.Data!.GetDataPresent(DataFormats.FileDrop))
             {
-                var (isPath, _) = IsDragDrop(e);
-                if (isPath)
+                var list = IsDragDrops(e);
+                if (list.Count == list.Where(e=>e.kind > 0).Count())
                 {
-                    e.Effect = DragDropEffects.Copy; // フォルダまたはZIPファイルならコピー可能
+                    e.Effect = DragDropEffects.Copy;
                     return;
                 }
             }
-            e.Effect = DragDropEffects.None; // ドロップ不可
+            e.Effect = DragDropEffects.None;
         }
 
         /// <summary>
@@ -157,24 +206,71 @@ namespace DiffPicker.Controllers
         /// <param name="e"></param>
         private void HandleDragDrop(object? sender, DragEventArgs e)
         {
-            var (isPath, path) = IsDragDrop(e);
-            if (isPath)
+            var list = IsDragDrops(e);
+
+            if (ReferenceEquals(sender, view))
             {
-                ((TextBox)sender!).Text = path;
+                // フォームにドロップされた場合、
+                // 各テキストボックスの空き状況に応じてパスを設定
+
+                foreach (var item in list)
+                {
+                    if (item.kind == 0)
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(view.GetTextBoxBefore()))
+                    {
+                        view.SetTextBoxBefore(item.path);
+                    } 
+                    else if (string.IsNullOrWhiteSpace(view.GetTextBoxAfter()))
+                    {
+                        view.SetTextBoxAfter(item.path);
+                    }
+                    else if (item.kind == 1 && string.IsNullOrWhiteSpace(view.GetTextBoxDiffPath()))
+                    {
+                        // パスは可、zip不可
+                        view.SetTextBoxDiffPath(item.path);
+                    }
+                }
+            }
+            else
+            {
+                // ドロップされたテキストボックスにパスを設定
+
+                if (list[0].kind > 0)
+                {
+                    if (!((TextBox)sender!).ReadOnly)
+                    {
+                        ((TextBox)sender!).Text = list[0].path;
+                    }
+                }
             }
         }
 
         /// <summary>
-        /// ディレクトリパスかzipパスであればtrueを返す
+        /// ドラッグ＆ドロップされたパスがフォルダかzipかをチェックし、種類とそのパスを返す
+        /// 種類  1:フォルダ  2:zip
         /// </summary>
         /// <param name="e"></param>
         /// <returns></returns>
-        private static (bool isPath, string path) IsDragDrop(DragEventArgs e)
+        private static List<(int kind, string path)> IsDragDrops(DragEventArgs e)
         {
+            var list = new List<(int kind, string path)>();
             var paths = (string[])e.Data!.GetData(DataFormats.FileDrop)!;
-            var model = new FilePathModel(paths[0], string.Empty);
-            var res = model.IsValidPath() || model.IsZipFile();
-            return (res, model.ManagedPath );
+            
+            // ドロップされるパスの順序が任意のためソート
+            Array.Sort(paths);
+
+            foreach (var path in paths)
+            {
+                var model = new FilePathModel(path, string.Empty);
+                var kind = (model.IsValidPath()?1:0) + (model.IsZipFile()?2:0);
+                list.Add((kind, model.ManagedPath));
+            }
+
+            return list;
         }
         #endregion
 
