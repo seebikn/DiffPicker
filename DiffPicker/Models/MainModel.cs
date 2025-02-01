@@ -11,12 +11,8 @@ namespace DiffPicker.Models
         /// <param name="beforePathModel">修正前パスモデル</param>
         /// <param name="afterPathModel">修正後パスモデル</param>
         /// <exception cref="Exception"></exception>
-        public void CompareAndCopy(FilePathModel beforePathModel, FilePathModel afterPathModel)
+        public int[] CompareAndCopy(FilePathModel beforePathModel, FilePathModel afterPathModel)
         {
-            // 差分が一件でもあるか管理するフラグ
-            bool diff = false;
-            var diffBag = new ConcurrentBag<bool>();
-
             // コピー先・コピー元フォルダパスを取得
             string beforeSourcePath = beforePathModel.GetSourcePath();
             string beforeDestinationPath = beforePathModel.GetDestinationPath();
@@ -28,12 +24,21 @@ namespace DiffPicker.Models
             var afterFiles = afterPathModel.EnumerateFiles();
             List<string> targetFiles;
 
+            // 戻り値
+            int retBeforeCount = beforeFiles.Count;     // ファイル総数
+            int retAfterCount = afterFiles.Count;
+            int retBeforeDiffCount = 0;                 // beforeにのみ存在するファイル数
+            int retAfterDiffCount = 0;
+            int retDiffCount = 0;                       // before/afterで互いに異なる数
+
             {
                 // 互いに存在しないファイルを差分としてdiffPathにコピーする
 
                 // それぞれに存在しないファイルを取得
                 var beforeExceptFiles = beforeFiles.Except(afterFiles).ToArray();
                 var afterExceptFiles = afterFiles.Except(beforeFiles).ToArray();
+                retBeforeDiffCount = beforeExceptFiles.Length;
+                retAfterDiffCount = afterExceptFiles.Length;
 
                 if (beforeFiles.Count == beforeExceptFiles.Length
                     || afterFiles.Count == afterExceptFiles.Length)
@@ -50,7 +55,6 @@ namespace DiffPicker.Models
                         var destFilePath = Path.Combine(destinationPath, filepath);
                         Directory.CreateDirectory(Path.GetDirectoryName(destFilePath)!);
                         File.Copy(sourceFilePath, destFilePath, true);
-                        diffBag.Add(true);
                     });
                 }
 
@@ -77,7 +81,7 @@ namespace DiffPicker.Models
                         var destFilepath = Path.Combine(destinationPath, filepath);
                         Directory.CreateDirectory(Path.GetDirectoryName(destFilepath)!);
                         File.Copy(sourceFilepath, destFilepath, true);
-                        diffBag.Add(true);
+                        Interlocked.Increment(ref retDiffCount); // スレッドセーフにカウントアップ
                     }
 
                     CopyFileToDiffPath(beforeFilePath, beforeDestinationPath, file);
@@ -85,28 +89,7 @@ namespace DiffPicker.Models
                 }
             });
 
-            diff = !diffBag.IsEmpty;
-
-            if (diff)
-            {
-                // 1つでも差異があった場合
-
-                // 差分出力先パスを作成
-                Directory.CreateDirectory(beforePathModel.GetDestinationPath());
-                Directory.CreateDirectory(afterPathModel.GetDestinationPath());
-
-                // winmerge比較ファイルを作成
-                {
-                    string winMergeFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diff.WinMerge");
-                    string destinationPath = Path.Combine(beforePathModel.DiffParentPath, "diff.WinMerge");
-                    File.Copy(winMergeFilePath, destinationPath, true);
-
-                    string content = File.ReadAllText(destinationPath);
-                    content = content.Replace("@@@before@@@", "01_修正前");
-                    content = content.Replace("@@@after@@@", "02_修正後");
-                    File.WriteAllText(destinationPath, content);
-                }
-            }
+            return [retBeforeCount, retAfterCount, retBeforeDiffCount, retAfterDiffCount, retDiffCount];
         }
 
         /// <summary>
