@@ -70,6 +70,7 @@
                 // ロックされていない場合はテキストクリア
                 TextBoxBefore.Text = string.Empty;
                 TextBoxAfter.Text = string.Empty;
+                TextBoxDiffPath.Text = string.Empty;
                 TextBoxResult.Text = string.Empty;
             }
         }

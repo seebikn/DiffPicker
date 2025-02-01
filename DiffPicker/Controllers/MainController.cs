@@ -241,7 +241,10 @@ namespace DiffPicker.Controllers
 
                 if (list[0].kind > 0)
                 {
-                    ((TextBox)sender!).Text = list[0].path;
+                    if (!((TextBox)sender!).ReadOnly)
+                    {
+                        ((TextBox)sender!).Text = list[0].path;
+                    }
                 }
             }
         }
