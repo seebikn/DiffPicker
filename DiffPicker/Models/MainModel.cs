@@ -92,19 +92,112 @@ namespace DiffPicker.Models
             return [retBeforeCount, retAfterCount, retBeforeDiffCount, retAfterDiffCount, retDiffCount];
         }
 
+        #region " ハッシュ比較 "
         /// <summary>
         /// 2つのファイルのハッシュを比較する
+        /// エクセルの場合は特殊処理
         /// </summary>
         /// <param name="file1"></param>
         /// <param name="file2"></param>
         /// <returns>true:差分あり false:差分なし</returns>
         private static bool EqualFiles(string file1, string file2)
         {
+            if (Path.GetExtension(file1).Equals(".xlsx", StringComparison.OrdinalIgnoreCase) &&
+                    Path.GetExtension(file2).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                return EqualXlsxFiles(file1, file2);
+            }
+
+            return _EqualFiles(file1, file2);
+        }
+        /// <summary>
+        /// 2つのファイルのハッシュを比較する
+        /// </summary>
+        /// <param name="file1"></param>
+        /// <param name="file2"></param>
+        /// <returns>true:差分あり false:差分なし</returns>
+        private static bool _EqualFiles(string file1, string file2)
+        {
             using var hash = SHA256.Create();
             using var stream1 = File.OpenRead(file1);
             using var stream2 = File.OpenRead(file2);
             return hash.ComputeHash(stream1).SequenceEqual(hash.ComputeHash(stream2));
         }
+        #endregion
 
+        #region " Excelファイル(xlsx)のハッシュ比較 "
+        /// <summary>
+        /// Excelファイル(xlsx)のハッシュ比較
+        /// xlsxのzipを解凍し、中のファイルに差異がないかチェックする。
+        /// 一部のファイルは更新日付などを持つため除外する。
+        /// </summary>
+        /// <param name="xlsx1"></param>
+        /// <param name="xlsx2"></param>
+        /// <returns></returns>
+        private static bool EqualXlsxFiles(string xlsx1, string xlsx2)
+        {
+            string tempDir1 = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string tempDir2 = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+            // ローカルメソッド：フォルダのファイルパスを返す。引数に除外リストを指定可能。
+            List<string> GetFilteredFileList(string directory, HashSet<string> excludeFiles)
+            {
+                // ローカルメソッド：絶対パスを相対パスに変換し、パス区切り違いを補正
+                string GetRelativePath(string basePath, string fullPath)
+                {
+                    return fullPath.Substring(basePath.Length + 1).Replace("\\", "/");
+                }
+
+                return Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
+                    .Where(f => !excludeFiles.Contains(GetRelativePath(directory, f))) // 除外リストにあるファイルを除く
+                    .OrderBy(f => f)
+                    .ToList();
+            }
+
+            try
+            {
+                // ZIP を解凍
+                System.IO.Compression.ZipFile.ExtractToDirectory(xlsx1, tempDir1);
+                System.IO.Compression.ZipFile.ExtractToDirectory(xlsx2, tempDir2);
+
+                // 除外するファイルリスト
+                HashSet<string> excludeFiles = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "docProps/core.xml",        // 更新日付や更新者を持つため除外する
+                    "xl/workbook.xml"           // documentIdが変化するため除外する
+                    // これ以外にも難しい比較が存在する。「セルに文字入力してセル確定。文字削除。」これで編集を加えた情報が残るため差異が発生する。現時点で対策なし。
+                };
+
+                // ファイル一覧を取得（除外リストにあるファイルを省く）
+                var files1 = GetFilteredFileList(tempDir1, excludeFiles);
+                var files2 = GetFilteredFileList(tempDir2, excludeFiles);
+
+                // ファイル数が違えば false
+                if (files1.Count != files2.Count)
+                {
+                    return false;
+                }
+
+                using var hash = SHA256.Create();
+
+                // 各ファイルのハッシュを比較
+                for (int i = 0; i < files1.Count; i++)
+                {
+                    if (!_EqualFiles(files1[i], files2[i]))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            finally
+            {
+                // 一時フォルダのクリーンアップ
+                if (Directory.Exists(tempDir1)) Directory.Delete(tempDir1, true);
+                if (Directory.Exists(tempDir2)) Directory.Delete(tempDir2, true);
+            }
+        }
+        #endregion
     }
 }
