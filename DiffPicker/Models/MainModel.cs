@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Security.Policy;
+using System.Text.RegularExpressions;
 
 namespace DiffPicker.Models
 {
@@ -123,6 +125,38 @@ namespace DiffPicker.Models
             using var stream2 = File.OpenRead(file2);
             return hash.ComputeHash(stream1).SequenceEqual(hash.ComputeHash(stream2));
         }
+
+        /// <summary>
+        /// 2つのexcelのsheetファイルのハッシュを比較する
+        /// </summary>
+        /// <param name="file1"></param>
+        /// <param name="file2"></param>
+        /// <returns></returns>
+        private static bool _EqualExcelsheetFiles(string file1, string file2)
+        {
+            using var hash = SHA256.Create();
+            byte[] hash1 = ComputeXmlHashWithoutSelection(file1, hash);
+            byte[] hash2 = ComputeXmlHashWithoutSelection(file2, hash);
+            return hash1.SequenceEqual(hash2);
+        }
+
+        /// <summary>
+        /// XMLファイルを読み込み、不要なタグを削除してハッシュを計算
+        /// 不要なタグ：selectionタグにアクティブセルの情報が記録される
+        /// </summary>
+        private static byte[] ComputeXmlHashWithoutSelection(string filePath, HashAlgorithm hash)
+        {
+            string content = File.ReadAllText(filePath);
+
+            // <sheetView> タグの中に <selection> がある場合、<sheetView> タグごとを削除
+            content = Regex.Replace(content, @"<sheetView([^>]*)>\s*<selection[^>]+/>\s*</sheetView>", "", RegexOptions.Singleline);
+
+            // 単体の <sheetView> タグを削除
+            content = Regex.Replace(content, @"<sheetView[^>]+/>", "", RegexOptions.Singleline);
+
+            return hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
+        }
+
         #endregion
 
         #region " Excelファイル(xlsx)のハッシュ比較 "
@@ -142,10 +176,10 @@ namespace DiffPicker.Models
             // ローカルメソッド：フォルダのファイルパスを返す。引数に除外リストを指定可能。
             List<string> GetFilteredFileList(string directory, HashSet<string> excludeFiles)
             {
-                // ローカルメソッド：絶対パスを相対パスに変換し、パス区切り違いを補正
+                // ローカルメソッド：絶対パスを相対パスに変換
                 string GetRelativePath(string basePath, string fullPath)
                 {
-                    return fullPath.Substring(basePath.Length + 1).Replace("\\", "/");
+                    return fullPath.Substring(basePath.Length + 1);
                 }
 
                 return Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
@@ -163,8 +197,9 @@ namespace DiffPicker.Models
                 // 除外するファイルリスト
                 HashSet<string> excludeFiles = new(StringComparer.OrdinalIgnoreCase)
                 {
-                    "docProps/core.xml",        // 更新日付や更新者を持つため除外する
-                    "xl/workbook.xml"           // documentIdが変化するため除外する
+                    "docProps\\core.xml",        // 更新日付や更新者を持つため除外する
+                    "xl\\workbook.xml",          // documentIdが変化するため除外する
+                    "xl\\calcChain.xml",         // 再計算順序などが自動生成されるため除外する
                     // これ以外にも難しい比較が存在する。「セルに文字入力してセル確定。文字削除。」これで編集を加えた情報が残るため差異が発生する。現時点で対策なし。
                 };
 
@@ -183,9 +218,20 @@ namespace DiffPicker.Models
                 // 各ファイルのハッシュを比較
                 for (int i = 0; i < files1.Count; i++)
                 {
-                    if (!_EqualFiles(files1[i], files2[i]))
+                    if (files1[i].Contains("xl\\worksheets\\") && files1[i].EndsWith(".xml"))
                     {
-                        return false;
+                        // xl/worksheets/sheet1.xlsなどの場合
+                        if (!_EqualExcelsheetFiles(files1[i], files2[i]))
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        if (!_EqualFiles(files1[i], files2[i]))
+                        {
+                            return false;
+                        }
                     }
                 }
 
