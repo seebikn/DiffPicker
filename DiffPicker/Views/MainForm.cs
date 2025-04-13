@@ -1,4 +1,6 @@
-﻿namespace DiffPicker
+﻿using System.Windows.Forms;
+
+namespace DiffPicker
 {
     public partial class MainForm : Form
     {
@@ -7,31 +9,39 @@
         public event DragEventHandler? OnHandleDragEnter;
         public event DragEventHandler? OnHandleDragDrop;
 
-        public string GetTextBoxBefore() => TextBoxBefore.Text;
-        public string GetTextBoxAfter() => TextBoxAfter.Text;
-        public string GetTextBoxDiffFolderName() => TextBoxDiffFolderName.Text;
-        public string GetTextBoxDiffPath() => TextBoxDiffPath.Text;
-        public string GetTextBoxOmitFilename() => TextBoxOmitFilename.Text;
-        public string GetTextBoxOmitFolder() => TextBoxOmitFolder.Text;
-
-        public void SetTextBoxBefore(string str)
+        public string BeforePath
         {
-            TextBoxBefore.Text = str;
+            get => TextBoxBefore.Text;
+            set => TextBoxBefore.Text = value;
         }
-
-        public void SetTextBoxAfter(string str)
+        public string AfterPath
         {
-            TextBoxAfter.Text = str;
+            get => TextBoxAfter.Text;
+            set => TextBoxAfter.Text = value;
         }
-
-        public void SetTextBoxDiffPath(string str)
+        public string DiffPath
         {
-            TextBoxDiffPath.Text = str;
+            get => TextBoxDiffPath.Text;
+            set => TextBoxDiffPath.Text = value;
         }
-
-        public void SetTextBoxResult(string str)
+        public string DiffFolderName
         {
-            TextBoxResult.Text = str;
+            get => TextBoxDiffFolder.Text;
+            set => TextBoxDiffFolder.Text = value;
+        }
+        public string OmitFile
+        {
+            get => TextBoxOmitFile.Text;
+            set => TextBoxOmitFile.Text = value;
+        }
+        public string OmitFolder
+        {
+            get => TextBoxOmitFolder.Text;
+            set => TextBoxOmitFolder.Text = value;
+        }
+        public string Result
+        {
+            set => TextBoxResult.Text = value;
         }
 
         public MainForm()
@@ -75,7 +85,7 @@
             }
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void ButtomChanges_Click(object sender, EventArgs e)
         {
             var before = TextBoxBefore.Text;
             var after = TextBoxAfter.Text;

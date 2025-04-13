@@ -1,4 +1,4 @@
-using DiffPicker.Controllers;
+﻿using DiffPicker.Controllers;
 
 namespace DiffPicker
 {
@@ -14,7 +14,9 @@ namespace DiffPicker
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            var controller = new MainController();
+            string iniFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+
+            var controller = new MainController(iniFilePath);
             controller.Run();
         }
     }

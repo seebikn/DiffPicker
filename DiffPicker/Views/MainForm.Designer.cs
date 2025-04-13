@@ -33,10 +33,10 @@
             label2 = new Label();
             TextBoxAfter = new TextBox();
             label3 = new Label();
-            TextBoxDiffFolderName = new TextBox();
+            TextBoxDiffFolder = new TextBox();
             label4 = new Label();
             TextBoxDiffPath = new TextBox();
-            TextBoxOmitFilename = new TextBox();
+            TextBoxOmitFile = new TextBox();
             TextBoxOmitFolder = new TextBox();
             label5 = new Label();
             label6 = new Label();
@@ -45,7 +45,7 @@
             ButtomExecute = new Button();
             TextBoxResult = new TextBox();
             ButtonClear = new Button();
-            button1 = new Button();
+            ButtomChanges = new Button();
             SuspendLayout();
             // 
             // label1
@@ -93,13 +93,12 @@
             label3.TabIndex = 9;
             label3.Text = "差分フォルダ";
             // 
-            // TextBoxDiffFolderName
+            // TextBoxDiffFolder
             // 
-            TextBoxDiffFolderName.Location = new Point(108, 102);
-            TextBoxDiffFolderName.Name = "TextBoxDiffFolderName";
-            TextBoxDiffFolderName.Size = new Size(248, 23);
-            TextBoxDiffFolderName.TabIndex = 10;
-            TextBoxDiffFolderName.Text = "比較結果";
+            TextBoxDiffFolder.Location = new Point(108, 102);
+            TextBoxDiffFolder.Name = "TextBoxDiffFolder";
+            TextBoxDiffFolder.Size = new Size(248, 23);
+            TextBoxDiffFolder.TabIndex = 10;
             // 
             // label4
             // 
@@ -119,13 +118,12 @@
             TextBoxDiffPath.Size = new Size(448, 23);
             TextBoxDiffPath.TabIndex = 8;
             // 
-            // TextBoxOmitFilename
+            // TextBoxOmitFile
             // 
-            TextBoxOmitFilename.Location = new Point(108, 131);
-            TextBoxOmitFilename.Name = "TextBoxOmitFilename";
-            TextBoxOmitFilename.Size = new Size(248, 23);
-            TextBoxOmitFilename.TabIndex = 12;
-            TextBoxOmitFilename.Text = ".dll;.exe;";
+            TextBoxOmitFile.Location = new Point(108, 131);
+            TextBoxOmitFile.Name = "TextBoxOmitFile";
+            TextBoxOmitFile.Size = new Size(248, 23);
+            TextBoxOmitFile.TabIndex = 12;
             // 
             // TextBoxOmitFolder
             // 
@@ -133,7 +131,6 @@
             TextBoxOmitFolder.Name = "TextBoxOmitFolder";
             TextBoxOmitFolder.Size = new Size(248, 23);
             TextBoxOmitFolder.TabIndex = 14;
-            TextBoxOmitFolder.Text = "bin;Debug;Release;.git;.github;.vs;";
             // 
             // label5
             // 
@@ -206,17 +203,17 @@
             ButtonClear.UseVisualStyleBackColor = true;
             ButtonClear.Click += ButtonClear_Click;
             // 
-            // button1
+            // ButtomChanges
             // 
-            button1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            button1.Font = new Font("Yu Gothic UI", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
-            button1.Location = new Point(562, 15);
-            button1.Name = "button1";
-            button1.Size = new Size(24, 52);
-            button1.TabIndex = 5;
-            button1.Text = "⇕";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += button1_Click;
+            ButtomChanges.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            ButtomChanges.Font = new Font("Yu Gothic UI", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 128);
+            ButtomChanges.Location = new Point(562, 15);
+            ButtomChanges.Name = "ButtomChanges";
+            ButtomChanges.Size = new Size(24, 52);
+            ButtomChanges.TabIndex = 5;
+            ButtomChanges.Text = "⇕";
+            ButtomChanges.UseVisualStyleBackColor = true;
+            ButtomChanges.Click += ButtomChanges_Click;
             // 
             // MainForm
             // 
@@ -224,7 +221,7 @@
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(689, 218);
-            Controls.Add(button1);
+            Controls.Add(ButtomChanges);
             Controls.Add(ButtonClear);
             Controls.Add(TextBoxResult);
             Controls.Add(ButtomExecute);
@@ -233,10 +230,10 @@
             Controls.Add(label6);
             Controls.Add(label5);
             Controls.Add(TextBoxOmitFolder);
-            Controls.Add(TextBoxOmitFilename);
+            Controls.Add(TextBoxOmitFile);
             Controls.Add(TextBoxDiffPath);
             Controls.Add(label4);
-            Controls.Add(TextBoxDiffFolderName);
+            Controls.Add(TextBoxDiffFolder);
             Controls.Add(label3);
             Controls.Add(TextBoxAfter);
             Controls.Add(label2);
@@ -257,10 +254,10 @@
         private Label label2;
         private TextBox TextBoxAfter;
         private Label label3;
-        private TextBox TextBoxDiffFolderName;
+        private TextBox TextBoxDiffFolder;
         private Label label4;
         private TextBox TextBoxDiffPath;
-        private TextBox TextBoxOmitFilename;
+        private TextBox TextBoxOmitFile;
         private TextBox TextBoxOmitFolder;
         private Label label5;
         private Label label6;
@@ -269,6 +266,6 @@
         private Button ButtomExecute;
         private TextBox TextBoxResult;
         private Button ButtonClear;
-        private Button button1;
+        private Button ButtomChanges;
     }
 }
