@@ -16,7 +16,7 @@ namespace DiffPicker.Models
         /// <summary>
         /// 画面上で指定されているパス
         /// </summary>
-        public string ManagedPath { get;  }
+        public string ManagedPath { get; }
 
         /// <summary>
         /// 画面上の名称
@@ -187,9 +187,11 @@ namespace DiffPicker.Models
         {
             string path = this.WorkingPath;
             var files = Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories);
-            return files.Select(file => file.Replace(path, "").TrimStart('\\'))
-                        .Where(file => !OmitFiles.Any(omit => file.EndsWith(omit, StringComparison.OrdinalIgnoreCase)) &&
-                               !OmitFolders.Any(folder => file.Contains(Path.DirectorySeparatorChar + folder + Path.DirectorySeparatorChar))).ToList();
+            return files.Select(file => file.Replace(path, "").TrimStart(Path.DirectorySeparatorChar))
+                        .Where(file => !OmitFiles.Any(omit => file.EndsWith(omit, StringComparison.OrdinalIgnoreCase)))
+                        .Where(file => !OmitFolders.Any(folder => file.StartsWith(folder + Path.DirectorySeparatorChar)))
+                        .Where(file => !OmitFolders.Any(folder => file.Contains(Path.DirectorySeparatorChar + folder + Path.DirectorySeparatorChar)))
+                        .ToList();
         }
 
     }
