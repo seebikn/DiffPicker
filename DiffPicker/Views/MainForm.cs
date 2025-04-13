@@ -29,9 +29,9 @@
             TextBoxDiffPath.Text = str;
         }
 
-        public void SetTextBoxResult(string str)    
+        public void SetTextBoxResult(string str)
         {
-            TextBoxResult.Text = str; 
+            TextBoxResult.Text = str;
         }
 
         public MainForm()
@@ -73,6 +73,14 @@
                 TextBoxDiffPath.Text = string.Empty;
                 TextBoxResult.Text = string.Empty;
             }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            var before = TextBoxBefore.Text;
+            var after = TextBoxAfter.Text;
+            TextBoxBefore.Text = after;
+            TextBoxAfter.Text = before;
         }
     }
 
