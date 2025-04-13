@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using DDic.Controllers;
 using DiffPicker.Models;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -10,8 +11,9 @@ namespace DiffPicker.Controllers
     {
         private readonly MainForm view;
         private readonly MainModel model;
+        private readonly IniController iniController;
 
-        public MainController()
+        public MainController(string iniFilePath)
         {
             model = new MainModel();
             view = new MainForm();
@@ -21,6 +23,8 @@ namespace DiffPicker.Controllers
 
             view.OnHandleDragEnter += HandleDragEnter;
             view.OnHandleDragDrop += HandleDragDrop;
+
+            iniController = new IniController(iniFilePath);
         }
 
         public void Run()
@@ -37,15 +41,28 @@ namespace DiffPicker.Controllers
                 // フォームのタイトルを設定
                 view.Text = $"{appName} - Version {majorVersion}.{minorVersion}";
             }
+            {
+                // iniファイルを読み込み
+                this.LoadSettings();
+            }
 
             Application.Run(view);
+        }
+        private void LoadSettings()
+        {
+            iniController.InitializeFile();
+
+            // カラム一覧 右クリックメニューの表示設定
+            view.DiffFolderName = iniController.Get(Constants.IniMain.section, Constants.IniMain.diffFolderName, string.Empty);
+            view.OmitFile = iniController.Get(Constants.IniMain.section, Constants.IniMain.omitFile, string.Empty);
+            view.OmitFolder = iniController.Get(Constants.IniMain.section, Constants.IniMain.omitFolder, string.Empty);
         }
 
         private void HandleExecuteComparison(object? sender, EventArgs e)
         {
             try
             {
-                var diffFolderName = view.GetTextBoxDiffFolderName();
+                var diffFolderName = view.DiffFolderName;
                 if (string.IsNullOrWhiteSpace(diffFolderName))
                 {
                     MessageBox.Show("差分フォルダを入力してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
@@ -53,9 +70,9 @@ namespace DiffPicker.Controllers
                 }
 
                 // 各フォルダパスの取得とエラーチェック
-                var diffPathModel = new FilePathModel(view.GetTextBoxDiffPath(), "差分出力パス");
-                var beforePathModel = new FilePathModel(view.GetTextBoxBefore(), "修正前パス");
-                var afterPathModel = new FilePathModel(view.GetTextBoxAfter(), "修正後パス");
+                var diffPathModel = new FilePathModel(view.DiffPath, "差分出力パス");
+                var beforePathModel = new FilePathModel(view.BeforePath, "修正前パス");
+                var afterPathModel = new FilePathModel(view.AfterPath, "修正後パス");
 
                 // ローカル関数：パスのエラーチェック
                 static bool isPathError(FilePathModel model, bool zip)
@@ -67,7 +84,7 @@ namespace DiffPicker.Controllers
                             MessageBox.Show($"{model.Name}にはフォルダパスかzipファイルパスを入力してください。", "確認", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                             return true;
                         }
-                    } 
+                    }
                     else
                     {
                         if (!model.IsValidPath())
@@ -92,8 +109,8 @@ namespace DiffPicker.Controllers
                 }
 
                 // 除外ファイル名、除外フォルダ名を取得
-                var omitFiles = view.GetTextBoxOmitFilename().Split(';').Where(str => !string.IsNullOrEmpty(str)).ToList();
-                var omitFolders = view.GetTextBoxOmitFolder().Split(';').Where(str => !string.IsNullOrEmpty(str)).ToList();
+                var omitFiles = view.OmitFile.Split(';').Where(str => !string.IsNullOrEmpty(str)).ToList();
+                var omitFolders = view.OmitFolder.Split(';').Where(str => !string.IsNullOrEmpty(str)).ToList();
 
                 // ファイルパスモデルに情報追加
                 {
@@ -133,7 +150,7 @@ namespace DiffPicker.Controllers
                               + $"修正前専用ファイル数 " + ret[2].ToString("N0").PadLeft(9) + "\r\n"
                               + $"修正後専用ファイル数 " + ret[3].ToString("N0").PadLeft(9) + "\r\n"
                               + $"異なるファイル数     " + ret[4].ToString("N0").PadLeft(9) + "\r\n";
-                view.SetTextBoxResult(result);
+                view.Result = result;
 
                 if (ret[2] + ret[3] + ret[4] > 0)
                 {
@@ -190,7 +207,7 @@ namespace DiffPicker.Controllers
             if (e.Data!.GetDataPresent(DataFormats.FileDrop))
             {
                 var list = IsDragDrops(e);
-                if (list.Count == list.Where(e=>e.kind > 0).Count())
+                if (list.Count == list.Where(e => e.kind > 0).Count())
                 {
                     e.Effect = DragDropEffects.Copy;
                     return;
@@ -220,18 +237,18 @@ namespace DiffPicker.Controllers
                         continue;
                     }
 
-                    if (string.IsNullOrWhiteSpace(view.GetTextBoxBefore()))
+                    if (string.IsNullOrWhiteSpace(view.BeforePath))
                     {
-                        view.SetTextBoxBefore(item.path);
-                    } 
-                    else if (string.IsNullOrWhiteSpace(view.GetTextBoxAfter()))
-                    {
-                        view.SetTextBoxAfter(item.path);
+                        view.BeforePath = item.path;
                     }
-                    else if (item.kind == 1 && string.IsNullOrWhiteSpace(view.GetTextBoxDiffPath()))
+                    else if (string.IsNullOrWhiteSpace(view.AfterPath))
+                    {
+                        view.AfterPath = item.path;
+                    }
+                    else if (item.kind == 1 && string.IsNullOrWhiteSpace(view.DiffPath))
                     {
                         // パスは可、zip不可
-                        view.SetTextBoxDiffPath(item.path);
+                        view.DiffPath = item.path;
                     }
                 }
             }
@@ -259,14 +276,14 @@ namespace DiffPicker.Controllers
         {
             var list = new List<(int kind, string path)>();
             var paths = (string[])e.Data!.GetData(DataFormats.FileDrop)!;
-            
+
             // ドロップされるパスの順序が任意のためソート
             Array.Sort(paths);
 
             foreach (var path in paths)
             {
                 var model = new FilePathModel(path, string.Empty);
-                var kind = (model.IsValidPath()?1:0) + (model.IsZipFile()?2:0);
+                var kind = (model.IsValidPath() ? 1 : 0) + (model.IsZipFile() ? 2 : 0);
                 list.Add((kind, model.ManagedPath));
             }
 
@@ -279,7 +296,7 @@ namespace DiffPicker.Controllers
         {
             var path = ((TextBox)sender!).Text;
             string parentPath = Path.GetDirectoryName(path.TrimEnd(Path.DirectorySeparatorChar))!;
-            view.SetTextBoxDiffPath(parentPath);
+            view.DiffPath = parentPath;
         }
         #endregion
 

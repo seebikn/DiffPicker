@@ -45,7 +45,7 @@ namespace DiffPicker.Models
                 if (beforeFiles.Count == beforeExceptFiles.Length
                     || afterFiles.Count == afterExceptFiles.Length)
                 {
-                    throw new Exception("ファイルが全て一致しないため処理を終了します。");
+                    throw new Exception("第一階層のファイル/フォルダが一致しないため処理を終了します。指定パス(階層)が正しいか確認してください。");
                 }
 
                 // ローカルメソッド：差分ファイルを差分出力先にコピー
